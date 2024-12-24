@@ -26,6 +26,14 @@ Notation "pg '.(vvalid)'" := (vvalid _ _ pg) (at level 1).
 Notation "pg '.(evalid)'" := (evalid _ _ pg) (at level 1).
 Notation "pg '.(src)'" := (src _ _ pg) (at level 1).
 Notation "pg '.(dst)'" := (dst _ _ pg) (at level 1).
+Notation "pg '.(weight)'" := (weight _ _ pg) (at level 1).
+Notation "pg '.(vevalid)'" := (vevalid _ _ pg) (at level 1).
+
+Lemma valid {V E: Type} (pg: PreGraph V E) :
+  forall e, pg.(evalid) e -> pg.(vvalid) (pg.(src) e) /\ pg.(vvalid) (pg.(dst) e).
+Proof.
+  intros. apply (pg.(vevalid) e). auto.
+Qed.
 
 Record step_aux {V E: Type} (pg: PreGraph V E) (e: E) (x y: V): Prop :=
 {
@@ -62,21 +70,69 @@ End Graph.
 Module Tree.
 Import Graph.
 
-Inductive adjacent {A: Type} : A -> A -> list A -> Prop :=
-  | adj_head : forall x y l, adjacent x y (x :: y :: l)
-  | adj_tail : forall x y z l, adjacent x y l -> adjacent x y (z :: l).
 
-Record Cycle {V E: Type} (pg: PreGraph V E) := {
-  cycle_vertex: list V;
-  cycle_edge: list E;
-  cycle_evalid: forall e, In e cycle_edge -> pg.(evalid) e;
-  
-  cycle_v_continuous: forall e1 e2, adjacent e1 e2 cycle_edge -> pg.(src) e1 = pg.(dst) e2;
-  cycle_no_dup: NoDup cycle_edge;
-  cycle_connected: forall x y, In x cycle_edge -> In y cycle_edge -> connected pg (pg.(src) x) (pg.(dst) y);
+Definition Cycle_ve_correspond_aux {V E: Type} (pg: PreGraph V E) (v: V) (l: list V): Prop := 
+  match l with
+  | nil => True
+  | x :: xs => 
+    step pg v x
+  end.
+
+Fixpoint Cycle_ve_correspond {V E: Type} (pg: PreGraph V E) (l: list V): Prop := 
+  match l with
+  | nil => True
+  | x :: xs => Cycle_ve_correspond_aux pg x xs /\ Cycle_ve_correspond pg xs
+  end.
+
+Fixpoint Nodup {V: Type} (l: list V): Prop :=
+  match l with
+  | nil => True
+  | x :: xs => ~ In x xs /\ Nodup xs
+  end.
+
+Print Coq.Lists.List.last.
+
+Definition is_head {V: Type} (l: list V) (v: V): Prop := 
+  match l with
+  | nil => False
+  | x :: xs => (v = x)
+  end. 
+
+Fixpoint is_last {V: Type} (l: list V) (v: V): Prop :=
+  match l with
+  | nil => False
+  | x :: nil => (x = v)
+  | x :: xs => (is_last xs v)
+  end.
+
+Record is_Cycle {V E: Type} (pg: PreGraph V E) (l: list V): Prop := {
+  cycle_ve_correspond: Cycle_ve_correspond pg l /\ (forall last head: V, is_head l head -> is_last l last -> step pg last head);
+  cycle_nodup: Nodup l;
+  cycle_vvalid: forall v, In v l -> pg.(vvalid) v;
 }.
 
+Definition no_cycle {V E: Type} (pg: PreGraph V E): Prop := 
+  forall l: list V, ~ is_Cycle pg l.
 
-End Tree.
+Definition graph_connected {V E: Type} (t: PreGraph V E): Prop := 
+  forall x y, t.(vvalid) x -> t.(vvalid) y -> connected t x y.
+
+(** True if t is a tree*)
+Definition is_tree {V E: Type} (pg t: PreGraph V E): Prop := 
+  subgraph t pg /\ no_cycle t /\ graph_connected t.
+
+
+ (* 这里缺少一个语法， 新构建record实例时，如何验证他应该满足的性质 *)
+(* Definition add_one_edge {V E: Type} (pg: PreGraph V E) (t: PreGraph V E) (e: E): PreGraph V E :=
+  Build_PreGraph V E (t.(vvalid) ∪ (Sets.singleton (pg.(src) e)) ∪ (Sets.singleton (pg.(dst) e))) (pg.(evalid) ∪ (Sets.singleton e)) (pg.(src)) (pg.(dst)) (pg.(weight)). *)
+
+(**一个树加一条边 有且仅有 一个环*)
+(* Theorem tree_add_one_edge: forall {V E: Type} (pg: PreGraph V E) (t: PreGraph V E) (e: E),
+  is_tree pg t -> pg.(evalid) e -> ~ t.(evalid) e -> 
+  exists! l, is_Cycle  l.
+Proof.
+  
+Qed. *)
+
 
 
