@@ -19,6 +19,7 @@ Record PreGraph (Vertex Edge: Type) := {
   src : Edge -> Vertex;
   dst : Edge -> Vertex;
   weight: Edge -> Z;
+  vevalid: forall e, evalid e -> vvalid (src e) /\ vvalid (dst e);
 }.
 
 Notation "pg '.(vvalid)'" := (vvalid _ _ pg) (at level 1).
@@ -49,13 +50,33 @@ Record subgraph {V E: Type} (pg1 pg2: PreGraph V E): Prop :=
   subgraph_dst: forall e, e ∈ pg1.(evalid) -> pg1.(dst) e = pg2.(dst) e;
 }.
 
-End Graph.
-
 Notation "'PreGraph'" := (Graph.PreGraph) (at level 0).
 Notation "pg '.(vvalid)'" := (Graph.vvalid _ _ pg) (at level 1).
 Notation "pg '.(evalid)'" := (Graph.evalid _ _ pg) (at level 1).
 Notation "pg '.(src)'" := (Graph.src _ _ pg) (at level 1).
 Notation "pg '.(dst)'" := (Graph.dst _ _ pg) (at level 1).
 
+End Graph.
+
+
+Module Tree.
+Import Graph.
+
+Inductive adjacent {A: Type} : A -> A -> list A -> Prop :=
+  | adj_head : forall x y l, adjacent x y (x :: y :: l)
+  | adj_tail : forall x y z l, adjacent x y l -> adjacent x y (z :: l).
+
+Record Cycle {V E: Type} (pg: PreGraph V E) := {
+  cycle_vertex: list V;
+  cycle_edge: list E;
+  cycle_evalid: forall e, In e cycle_edge -> pg.(evalid) e;
+  
+  cycle_v_continuous: forall e1 e2, adjacent e1 e2 cycle_edge -> pg.(src) e1 = pg.(dst) e2;
+  cycle_no_dup: NoDup cycle_edge;
+  cycle_connected: forall x y, In x cycle_edge -> In y cycle_edge -> connected pg (pg.(src) x) (pg.(dst) y);
+}.
+
+
+End Tree.
 
 
